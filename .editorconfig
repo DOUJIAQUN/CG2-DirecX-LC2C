@@ -1,2 +1,2 @@
-[*.{cpp,h}]
-charest = utf - 8
+[*.{cpp,h,hlsl,hlsli}]
+charest = utf-8
