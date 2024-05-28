@@ -24,6 +24,13 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
+
+	if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam))
+	{
+		return true;
+	}
+
+
 	switch (msg) {
 
 	case WM_DESTROY:
@@ -191,7 +198,10 @@ ID3D12DescriptorHeap* CreatDescriptorHeap(
 	return descriptorHeap;
 }
 
+static float color[4] = { 1.0f, 0.0f, 0.0f, 1.0f };
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+
 
 #pragma region Windowの生成
 
@@ -570,7 +580,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Transform cameraTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
 
+
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(hwnd);
+	ImGui_ImplDX12_Init(device,
+		swapChainDesc.BufferCount,
+		rtvDesc.Format,
+		srvDescriptorHeap,
+		srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
+		srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
 	MSG msg{};
+
+	
+
 	while (msg.message != WM_QUIT) {
 
 		if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -579,6 +604,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		}
 		else {
 			//ゲーム処理
+
+			ID3D12DescriptorHeap* decriptorHeaps[] = { srvDescriptorHeap };
+			commandList->SetDescriptorHeaps(1, decriptorHeaps);
+
+			ImGui_ImplDX12_NewFrame();
+			ImGui_ImplWin32_NewFrame();
+			ImGui::NewFrame();
+
+			ImGui::ColorEdit4("Triangle Color", color);
+
+		/*	ImGui::ShowDemoWindow();*/
+
+
+			ImGui::Render();
+
+			
 
 			//これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
@@ -619,6 +660,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
+			*materialData = Vector4{ color[0], color[1], color[2], color[3] };
+
 			transform.rotate.y += 0.03f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
@@ -629,6 +672,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			commandList->DrawInstanced(3, 1, 0, 0);
 
+			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
 			//画面に描く処理はすべて終わり、画面に映すので、状態を遷移
 			//今回はRenderTargetからPresentにする
 			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET; barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
@@ -660,8 +704,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			assert(SUCCEEDED(hr));
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
+
+		
+
 		}
+		
+
 	}
+
 #pragma region 解放処理
 	CloseHandle(fenceEvent);
 	fence->Release();
@@ -689,6 +739,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
 	materialResource->Release();
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
+
 	CloseWindow(hwnd);
 #pragma endregion
 
