@@ -1,3 +1,4 @@
+
 #pragma once
 struct Vector4 {
     float x, y, z, w;
@@ -41,7 +42,7 @@ struct Material {
 };
 struct TransformationMatrix {
     Matrix4x4 WVP;
-    Matrix4x4 world;
+    Matrix4x4 World;
 };
 struct DirectionalLight {
     Vector4 color;

@@ -1,3 +1,4 @@
+
 #pragma once
 #include <assert.h>
 #include<cmath>
@@ -17,4 +18,6 @@ Matrix4x4 Inverse(const Matrix4x4& m);
 
 Matrix4x4 MakeIdentity4x4();
 
-void Sphere(VertexData* vertexData);
+float Length(const Vector3& vec);
+
+Vector3 Normalize(const Vector3& vec);
