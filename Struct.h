@@ -1,4 +1,3 @@
-
 #pragma once
 struct Vector4 {
     float x, y, z, w;
@@ -8,6 +7,9 @@ struct Vector3 {
 };
 struct Vector2 {
     float x, y;
+};
+struct Matrix3x3 {
+    float m[3][3];
 };
 struct Matrix4x4 {
     float m[4][4];
@@ -39,6 +41,8 @@ struct TriangleData {
 struct Material {
     Vector4 color;
     int32_t enableLighting;
+    float padding[3];
+    Matrix4x4 uvTransfotm;
 };
 struct TransformationMatrix {
     Matrix4x4 WVP;
