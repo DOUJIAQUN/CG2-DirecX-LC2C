@@ -81,6 +81,9 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h">
       <Filter>Imgui</Filter>
     </ClInclude>
+    <ClInclude Include="ResourceObject.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt">

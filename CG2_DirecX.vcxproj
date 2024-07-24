@@ -45,6 +45,7 @@
     <ClInclude Include="externals\imgui\imstb_textedit.h" />
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="MyMath.h" />
+    <ClInclude Include="ResourceObject.h" />
     <ClInclude Include="Struct.h" />
   </ItemGroup>
   <ItemGroup>
