@@ -13,6 +13,7 @@
 #include<vector>
 #include"Struct.h"
 #include"MyMath.h"
+#include"DebugReporter.h"
 
 #include "externals/DirectXTex/DirectXTex.h"
 #include "externals/DirectXTex/d3dx12.h"
@@ -420,9 +421,13 @@ D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descrip
 }
 
 
+
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
+    DebugReporter debugReporter;
+
     CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+
 
 
 #pragma region Windowの生成
@@ -468,7 +473,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         //さらに6GPUでもチェックを行うようにする
         debugController->SetEnableGPUBasedValidation(TRUE);
     }
-#endif // DEBUG
+
 
 
 #pragma region DXGIFactoryの生成
@@ -531,7 +536,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     const uint32_t descriptorSizeRTV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
     const uint32_t descriptorSizeDSV = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
-#ifdef _DEBUG
+
 
     ID3D12InfoQueue* infoQueue = nullptr;
 
@@ -564,7 +569,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         //解放
         infoQueue->Release();
     }
-#endif
+
 
 
 #pragma region ComandQueueを生成する
@@ -1111,7 +1116,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
     D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
     //SRWの生成
-    device->CreateShaderResourceView(textureResource2, &srvDesc2, textureSrvHandleCPU2);
+    device->CreateShaderResourceView(textureResource.Get(), &srvDesc, textureSrvHandleCPU1);
+
+    textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
+    textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
+    device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+
+    // 初始化第三个纹理
+    textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
+    textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
+    device->CreateShaderResourceView(textureResource3.Get(), &srvDesc3, textureSrvHandleCPU3);
+
+
+
+    // 初始化第三个纹理
+    textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+    textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+    device->CreateShaderResourceView(textureResource3, &srvDesc3, textureSrvHandleCPU3);
+
+
 
     static ImVec4 ballColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     static ImVec4 spriteColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1138,6 +1161,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     {1.0f,1.0f,1.0f},
     {0.0f,0.0f,0.0f},
     {0.0f,0.0f,0.0f}
+    };
+
+    enum class DrawMode {
+        Sphere,
+        Sprite,
+        Model
     };
 
     MSG msg{};
@@ -1214,10 +1243,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             commandList->SetGraphicsRootSignature(rootSignature);
             commandList->SetPipelineState(graphicsPipelineState);
 
-            // 3D球を描画する
-            commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-            commandList->IASetIndexBuffer(&indexBufferView);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            // 3D球
+            if (currentDrawMode == DrawMode::Sphere) {
+                commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+                commandList->IASetIndexBuffer(&indexBufferView);
+                commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             materialData->color.x = ballColor.x;
             materialData->color.y = ballColor.y;
@@ -1282,10 +1312,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             ImGui::ColorEdit4("Sprite Color", &spriteColor.x);
             ImGui::DragFloat3("TranslateSprite", &translateSprite.x, 1.0f);
 
-            ImGui::Text("Model");
-            ImGui::DragFloat3("Model Translate", &modelTranslate.x, 0.1f);
-            ImGui::DragFloat3("Model Rotate", &modelRotate.x, 0.1f);
-            ImGui::DragFloat3("Model Scale", &modelScale.x, 0.1f);
+            if (currentDrawMode == DrawMode::Model) {
+                ImGui::Text("Model");
+                ImGui::DragFloat3("Model Translate", &modelTranslate.x, 0.1f);
+                ImGui::DragFloat3("Model Rotate", &modelRotate.x, 0.1f);
+                ImGui::DragFloat3("Model Scale", &modelScale.x, 0.1f);
+                ImGui::Checkbox("enableLighting", &enableLightingModel);
+                ImGui::ColorEdit4("Light Color", &directionalLightDataModel->color.x);
+                ImGui::DragFloat3("Light Direction", &directionalLightDataModel->direction.x, 0.1f);
+                directionalLightDataModel->direction = Normalize(directionalLightDataModel->direction);
+                ImGui::DragFloat("Light Intensity", &directionalLightDataModel->intensity, 0.1f);
+            }
+
+            ImGui::End();
 
             ImGui::Checkbox("enableLighting", &enableLighting);
             ImGui::ColorEdit4("Light Color", &directionalLightData->color.x);
@@ -1376,14 +1415,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     CoUninitialize();
 #pragma endregion
 
-    IDXGIDebug1* debug;
-
-    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
-        debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-        debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
-        debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
-        debug->Release();
-    }
 
 
     return 0;
