@@ -465,8 +465,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 #pragma endregion
 
-#ifdef _DEBUG
-    ID3D12Debug1* debugController = nullptr;
+
+    Microsoft::WRL::ComPtr<ID3D12Debug1> debugController;
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
         //デバッグレイヤーを有効化する
         debugController->EnableDebugLayer();
@@ -538,8 +538,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 
 
-    ID3D12InfoQueue* infoQueue = nullptr;
-
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
     if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
 
         //ヤバイエラー時に止まる
@@ -1113,26 +1112,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     srvDesc2.Texture2D.MipLevels = static_cast<UINT>(metadata2.mipLevels);
 
     //SRVを作成する DescriptorHeapの場所を決める
-    D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
-    D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+    D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU1, textureSrvHandleCPU2, textureSrvHandleCPU3;
+    D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU1, textureSrvHandleGPU2, textureSrvHandleGPU3;
+    textureSrvHandleCPU1 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 1);
+    textureSrvHandleGPU1 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 1);
     //SRWの生成
-    device->CreateShaderResourceView(textureResource.Get(), &srvDesc, textureSrvHandleCPU1);
+    device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU1);
 
-    textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
-    textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 2);
-    device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
+    textureSrvHandleCPU2 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+    textureSrvHandleGPU2 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 2);
+    device->CreateShaderResourceView(textureResource2, &srvDesc2, textureSrvHandleCPU2);
 
     // 初始化第三个纹理
     textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
     textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap.Get(), descriptorSizeSRV, 3);
     device->CreateShaderResourceView(textureResource3.Get(), &srvDesc3, textureSrvHandleCPU3);
-
-
-
-    // 初始化第三个纹理
-    textureSrvHandleCPU3 = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
-    textureSrvHandleGPU3 = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
-    device->CreateShaderResourceView(textureResource3, &srvDesc3, textureSrvHandleCPU3);
 
 
 
@@ -1265,23 +1259,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
             commandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
 
-            // 2D Spriteを描画する
-            commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite); // VBVを設定
-            commandList->IASetIndexBuffer(&indexBufferViewSprite); // IBVを設定
-            materialDataSprite->color.x = spriteColor.x;
-            materialDataSprite->color.y = spriteColor.y;
-            materialDataSprite->color.z = spriteColor.z;
-            materialDataSprite->color.w = spriteColor.w;
-            materialDataSprite->enableLighting = enableLightingSprite;
-            commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
-            commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
-            commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+                materialDataSprite->color.x = spriteColor.x;
+                materialDataSprite->color.y = spriteColor.y;
+                materialDataSprite->color.z = spriteColor.z;
+                materialDataSprite->color.w = spriteColor.w;
+                materialDataSprite->enableLighting = enableLightingSprite;
+                commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+                commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
+                commandList->SetGraphicsRootConstantBufferView(3, directionalLightResourceSprite->GetGPUVirtualAddress());
+                commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU1);
+                commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+            }
 
-            //modelを描画
-            commandList->IASetVertexBuffers(0, 1, &vertexBufferViewModel);
-            commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            //
+            commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+            //model
+            if (currentDrawMode == DrawMode::Model) {
+                commandList->IASetVertexBuffers(0, 1, &vertexBufferViewModel);
+                commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             //
             commandList->SetGraphicsRootConstantBufferView(0, materialResourceModel->GetGPUVirtualAddress());
@@ -1374,46 +1370,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
             assert(SUCCEEDED(hr));
         }
     }
-#pragma region 解放処理
 
-    ImGui_ImplDX12_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
+    IDXGIDebug1* debug;
 
-    CloseHandle(fenceEvent);
-    fence->Release();
-
-    rtvDescriptorHeap->Release();
-    srvDescriptorHeap->Release();
-    swapChainResources[0]->Release();
-    swapChainResources[1]->Release();
-    swapChain->Release();
-    commandList->Release();
-    commandAllocator->Release();
-    commandQueue->Release();
-    device->Release();
-    useAdapter->Release();
-    dxgiFactory->Release();
-#ifdef _DEBUG
-    debugController->Release();
-#endif
-    vertexResource->Release();
-    graphicsPipelineState->Release();
-    signatureBlob->Release();
-    if (errorBlob) {
-        errorBlob->Release();
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
+        debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+        debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+        debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+        debug->Release();
     }
-    rootSignature->Release();
-    pixelShaderBlob->Release();
-    vertexShaderBlob->Release();
-    textureResource->Release();
-    materialResourceSprite->Release();
-    materialResource->Release();
-    vertexResourceModel->Release();
-    materialResourceModel->Release();
-    CloseWindow(hwnd);
-    CoUninitialize();
-#pragma endregion
 
 
 
